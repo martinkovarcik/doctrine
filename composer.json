@@ -1,0 +1,27 @@
+{
+	"name": "esports/nette-doctrine",
+	"description": "Nette doctrine integration",
+	"homepage": "https://github.com/pt24/doctrine",
+	"authors": [
+		{
+			"name": "eSports",
+			"homepage": "http://www.esports.cz"
+		}
+	],
+	"require": {
+		"php": ">=5.6",
+		"nette/utils": "~2.3",
+		"nette/di": "~2.3",
+		"tracy/tracy": "~2.3",
+		"doctrine/orm": "~2.5",
+		"kdyby/doctrine-cache": "~2.4",
+		"kdyby/annotations": "~2.1"
+	},
+	"require-dev": {
+		"nette/robot-loader": "~2.0",
+		"nette/tester": "~1.0"
+	},
+	"autoload": {
+		"classmap": ["src/"]
+	}
+}
