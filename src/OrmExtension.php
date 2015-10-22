@@ -6,6 +6,7 @@ use Doctrine\Common\Proxy\AbstractProxyFactory;
 use Kdyby\DoctrineCache\DI\Helpers as CacheHelpers;
 use Nette\DI\CompilerExtension;
 use Nette\DI\ContainerBuilder;
+use Nette\DI\Helpers;
 use Nette\DI\ServiceDefinition;
 use Nette\PhpGenerator\ClassType;
 use Nette\Utils\AssertionException;
@@ -57,7 +58,7 @@ class OrmExtension extends CompilerExtension {
 	 */
 	public function loadConfiguration() {
 		$builder = $this->getContainerBuilder();
-		$config = $this->getConfig() + $this->defaults;
+		$config = Helpers::expand($this->getConfig() + $this->defaults, $builder->parameters);
 		$this->assertConfig($config);
 		$builder->parameters[$this->prefix('debug')] = !empty($config['debug']);
 
