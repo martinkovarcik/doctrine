@@ -134,11 +134,16 @@ class OrmExtension extends CompilerExtension {
 	 */
 	protected function registerMetadataDrivers(ContainerBuilder $builder, $metadata) {
 		$builder->addDefinition($this->prefix('reader'))
-				->setClass('Doctrine\Common\Annotations\AnnotationReader');
+				->setClass('Doctrine\Common\Annotations\AnnotationReader')
+				->setAutowired(FALSE);
 
 		$builder->addDefinition($this->prefix('cachedReader'))
-				->setClass('Doctrine\Common\Annotations\CachedReader')
-				->setArguments([$this->prefix('@reader'), $this->prefix('@cache.metadata')]);
+				->setClass('Doctrine\Common\Annotations\Reader')
+				->setFactory('Doctrine\Common\Annotations\CachedReader', [
+					$this->prefix('@reader'),
+					$this->prefix('@cache.metadata')
+				])
+				->setInject(FALSE);
 
 		$metadataDriver = $builder->addDefinition($this->prefix('metadataDriver'))
 				->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriverChain')
@@ -314,6 +319,7 @@ class OrmExtension extends CompilerExtension {
 	public function afterCompile(ClassType $class) {
 		$init = $class->methods['initialize'];
 		$init->addBody('Esports\Doctrine\Diagnostics\Panel::registerBluescreen($this);');
+		$init->addBody('Doctrine\Common\Annotations\AnnotationRegistry::registerLoader("class_exists");');
 	}
 
 }
