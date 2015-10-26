@@ -53,6 +53,15 @@ class OrmExtension extends CompilerExtension {
 		'autoGenerateProxyClasses' => '%debugMode%'
 	);
 
+	private $metadataDriverClasses = [
+		'annotation' => 'createMetadataAnnotationDriver',
+		'static' => 'createMetadataStaticDriver',
+		'yml' => 'createMetadataYmlDriver',
+		'yaml' => 'createMetadataYamlDriver',
+		'xml' => 'createMetadataXmlDriver',
+		'db' => 'createMetadataDbDriver'
+	];
+
 	/**
 	 * @inheritDoc
 	 */
@@ -136,11 +145,14 @@ class OrmExtension extends CompilerExtension {
 				->setAutowired(FALSE)
 				->setInject(FALSE);
 
-		foreach ($metadata as $namespace => $path) {
-			$serviceName = $this->prefix('driver.' . str_replace('\\', '_', $namespace) . '.' . 'Impl');
-			$driver = $this->createAnnotationDriver((array) $path);
-			$builder->addDefinition($serviceName, $driver);
-			$metadataDriver->addSetup('addDriver', ['@' . $serviceName, $namespace]);
+		foreach ($metadata as $namespace => $driverMetadata) {
+			foreach ($driverMetadata as $driverName => $paths) {
+				$serviceName = $this->prefix('driver.' . str_replace('\\', '_', $namespace) . ".$driverName.Impl");
+				$callback = [$this, $this->metadataDriverClasses[$driverName]];
+				$driver = $callback((array)$paths);
+				$builder->addDefinition($serviceName, $driver);
+				$metadataDriver->addSetup('addDriver', ['@' . $serviceName, $namespace]);
+			}
 		}
 	}
 
@@ -195,9 +207,17 @@ class OrmExtension extends CompilerExtension {
 		Validators::assertField($config, 'metadata', 'array');
 		Validators::assertField($config, 'filters', 'array');
 
-		foreach ($config['metadata'] as $paths) {
-			foreach ((array) $paths as $path) {
-				$this->checkPath($path);
+		foreach ($config['metadata'] as $driver) {
+			Validators::assert($driver, 'array');
+
+			foreach ($driver as $driverName => $paths) {
+				if (!isset($this->metadataDriverClasses[$driverName])) {
+					throw new AssertionException("Wrong metadata driver $driverName. Allowed drivers are " . implode(', ', array_keys($this->metadataDriverClasses)) . '.');
+				}
+
+				foreach ((array)$paths as $path) {
+					$this->checkPath($path);
+				}
 			}
 		}
 	}
@@ -228,11 +248,62 @@ class OrmExtension extends CompilerExtension {
 	/**
 	 * @param array $path
 	 * @return ServiceDefinition
-	 * @throws AssertionException
 	 */
-	protected function createAnnotationDriver($path) {
+	protected function createMetadataAnnotationDriver($path) {
+		return $this->createMetadataServiceDefinition()
+						->setClass('Doctrine\ORM\Mapping\Driver\AnnotationDriver', [$this->prefix('@cachedReader'), $path]);
+	}
+
+	/**
+	 * @param array $path
+	 * @return ServiceDefinition
+	 */
+	protected function createMetadataYmlDriver($path) {
+		return $this->createMetadataServiceDefinition()
+						->setClass('Doctrine\ORM\Mapping\Driver\YamlDriver', [$path]);
+	}
+
+	/**
+	 * @param array $path
+	 * @return ServiceDefinition
+	 */
+	protected function createMetadataYamlDriver($path) {
+		return $this->createMetadataYmlDriver($path);
+	}
+
+	/**
+	 * @param array $path
+	 * @return ServiceDefinition
+	 */
+	protected function createMetadataStaticDriver($path) {
+		return $this->createMetadataServiceDefinition()
+						->setClass('Doctrine\Common\Persistence\Mapping\Driver\StaticPHPDriver', [$path]);
+	}
+
+	/**
+	 * @param array $path
+	 * @return ServiceDefinition
+	 */
+	protected function createMetadataXmlDriver($path) {
+		return $this->createMetadataServiceDefinition()
+						->setClass('Doctrine\ORM\Mapping\Driver\XmlDriver', [$path]);
+	}
+
+	/**
+	 * @param array $path
+	 * @return ServiceDefinition
+	 */
+	protected function createMetadataDbDriver($path) {
+		return $this->createMetadataServiceDefinition()
+				->setClass('Doctrine\ORM\Mapping\Driver\DatabaseDriver', [$path]);
+	}
+
+	/**
+	 * @return ServiceDefinition
+	 */
+	protected function createMetadataServiceDefinition() {
 		return (new ServiceDefinition())
-						->setClass('Doctrine\ORM\Mapping\Driver\AnnotationDriver', [$this->prefix('@cachedReader'), $path])
+						->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriver')
 						->setAutowired(FALSE)
 						->setInject(FALSE);
 	}
