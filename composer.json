@@ -14,8 +14,7 @@
 		"nette/di": "~2.3",
 		"tracy/tracy": "~2.3",
 		"doctrine/orm": "~2.5",
-		"kdyby/doctrine-cache": "~2.4",
-		"kdyby/annotations": "~2.1"
+		"kdyby/doctrine-cache": "~2.4"
 	},
 	"require-dev": {
 		"nette/robot-loader": "~2.0",
