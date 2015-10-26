@@ -172,6 +172,10 @@ class OrmExtension extends CompilerExtension {
 			}
 		}
 
+		foreach ($config['filters'] as $name => $class) {
+			$configuration->addSetup('addFilter', [$name, $class]);
+		}
+
 		$autoGenerateProxyClasses = is_bool($config['autoGenerateProxyClasses']) ? ($config['autoGenerateProxyClasses'] ? AbstractProxyFactory::AUTOGENERATE_ALWAYS : AbstractProxyFactory::AUTOGENERATE_FILE_NOT_EXISTS) : $config['autoGenerateProxyClasses'];
 		$configuration->addSetup('setAutoGenerateProxyClasses', [$autoGenerateProxyClasses]);
 		return $configuration;
@@ -189,6 +193,7 @@ class OrmExtension extends CompilerExtension {
 		Validators::assertField($config['dql'], 'numeric', 'array');
 		Validators::assertField($config['dql'], 'datetime', 'array');
 		Validators::assertField($config, 'metadata', 'array');
+		Validators::assertField($config, 'filters', 'array');
 
 		foreach ($config['metadata'] as $paths) {
 			foreach ((array) $paths as $path) {
