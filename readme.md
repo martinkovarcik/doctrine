@@ -8,7 +8,6 @@ Rozšíření pro integraci Doctrine ORM do Nette Framework
 
 ```
 extensions:
-	annotations: Kdyby\Annotations\DI\AnnotationsExtension
 	doctrine: App\OrmExtension
 ```
 
@@ -19,5 +18,21 @@ doctrine:
 	password: somepassword
 	dbname: databasename
 	metadata:
-		TargetNamespace: %appDir%
+		NamespaceName:
+			DriverName:
+				- PathToDomainObjects
+				- AnotherPathToDomainObjects
+
+		SecondNamespaceName:
+			DriverName:
+				- PathToDomainObjects
 ```
+
+Jako parametr DriverName je možné využít parametry:
+
+* annotation (pro čtení anotací z doménového objektu)
+* xml
+* yml
+* yaml
+* db
+* static
