@@ -93,7 +93,6 @@ class OrmExtension extends CompilerExtension {
 	 */
 	protected function createEntityManagerDefinition() {
 		return (new ServiceDefinition)
-						->setClass('Doctrine\Common\EventManager')
 						->setClass('Doctrine\ORM\EntityManager')
 						->setFactory('Doctrine\ORM\EntityManager::create', [
 							$this->prefix('@connection'),
