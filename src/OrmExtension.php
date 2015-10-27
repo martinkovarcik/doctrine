@@ -50,9 +50,9 @@ class OrmExtension extends CompilerExtension {
 		'entityListenerResolver' => NULL,
 		'namingStrategy' => NULL,
 		'quoteStrategy' => NULL,
-		'autoGenerateProxyClasses' => '%debugMode%'
+		'autoGenerateProxyClasses' => '%debugMode%',
+		'eventSubscribers' => []
 	);
-
 	private $metadataDriverClasses = [
 		'annotation' => 'createMetadataAnnotationDriver',
 		'static' => 'createMetadataStaticDriver',
@@ -73,19 +73,26 @@ class OrmExtension extends CompilerExtension {
 
 		$this->registerMetadataDrivers($builder, $config['metadata']);
 		$builder->addDefinition($this->prefix('config'), $this->createConfigurationServiceDefinition($config));
-		$builder->addDefinition($this->prefix('evm'), $this->createEventManagerDefinition());
+		$builder->addDefinition($this->prefix('evm'), $this->createEventManagerDefinition($config));
 		$builder->addDefinition($this->prefix('connection'), $this->createConnectionDefinition($config));
 		$builder->addDefinition($this->prefix('em'), $this->createEntityManagerDefinition());
 	}
 
 	/**
+	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	protected function createEventManagerDefinition() {
-		return (new ServiceDefinition)
-						->setClass('Doctrine\Common\EventManager')
-						->setAutowired(FALSE)
-						->setInject(FALSE);
+	protected function createEventManagerDefinition(array $config) {
+		$evm = (new ServiceDefinition)
+				->setClass('Doctrine\Common\EventManager')
+				->setAutowired(FALSE)
+				->setInject(FALSE);
+
+		foreach ($config['eventSubscribers'] as $eventSubscriber) {
+			$evm->addSetup('addEventSubscriber', [$eventSubscriber]);
+		}
+
+		return $evm;
 	}
 
 	/**
@@ -153,7 +160,7 @@ class OrmExtension extends CompilerExtension {
 			foreach ($driverMetadata as $driverName => $paths) {
 				$serviceName = $this->prefix('driver.' . str_replace('\\', '_', $namespace) . ".$driverName.Impl");
 				$callback = [$this, $this->metadataDriverClasses[$driverName]];
-				$driver = $callback((array)$paths);
+				$driver = $callback((array) $paths);
 				$builder->addDefinition($serviceName, $driver);
 				$metadataDriver->addSetup('addDriver', ['@' . $serviceName, $namespace]);
 			}
@@ -210,6 +217,7 @@ class OrmExtension extends CompilerExtension {
 		Validators::assertField($config['dql'], 'datetime', 'array');
 		Validators::assertField($config, 'metadata', 'array');
 		Validators::assertField($config, 'filters', 'array');
+		Validators::assertField($config, 'eventSubscribers', 'array');
 
 		foreach ($config['metadata'] as $driver) {
 			Validators::assert($driver, 'array');
@@ -219,7 +227,7 @@ class OrmExtension extends CompilerExtension {
 					throw new AssertionException("Wrong metadata driver $driverName. Allowed drivers are " . implode(', ', array_keys($this->metadataDriverClasses)) . '.');
 				}
 
-				foreach ((array)$paths as $path) {
+				foreach ((array) $paths as $path) {
 					$this->checkPath($path);
 				}
 			}
@@ -299,7 +307,7 @@ class OrmExtension extends CompilerExtension {
 	 */
 	protected function createMetadataDbDriver($path) {
 		return $this->createMetadataServiceDefinition()
-				->setClass('Doctrine\ORM\Mapping\Driver\DatabaseDriver', [$path]);
+						->setClass('Doctrine\ORM\Mapping\Driver\DatabaseDriver', [$path]);
 	}
 
 	/**
