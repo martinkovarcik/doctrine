@@ -103,7 +103,8 @@ class OrmExtension extends CompilerExtension {
 						->setClass('Doctrine\ORM\EntityManager')
 						->setFactory('Doctrine\ORM\EntityManager::create', [
 							$this->prefix('@connection'),
-							$this->prefix('@config')
+							$this->prefix('@config'),
+							$this->prefix('@evm')
 						])
 						->setAutowired(TRUE)
 						->setInject(FALSE);
