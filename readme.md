@@ -8,7 +8,7 @@ Rozšíření pro integraci Doctrine ORM do Nette Framework
 
 ```
 extensions:
-	doctrine: App\OrmExtension
+	doctrine: Esports\Doctrine\OrmExtension
 ```
 
 ## Nastavení parametrů ##
