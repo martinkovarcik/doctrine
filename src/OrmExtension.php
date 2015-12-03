@@ -127,7 +127,7 @@ class OrmExtension extends CompilerExtension {
 
 		foreach ($config['types'] as $type => $class) {
 			$connection
-					->addSetup('Doctrine\DBAL\Types\Type::addType', [$type, $class])
+					->addSetup('if (!Doctrine\DBAL\Types\Type::hasType(?)) {Doctrine\DBAL\Types\Type::addType(?, ?);}', [$type, $type, $class])
 					->addSetup('$service->getDatabasePlatform()->registerDoctrineTypeMapping(?, ?)', [$type, $type]);
 		}
 
