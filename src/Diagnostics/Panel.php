@@ -30,7 +30,7 @@ use Esports\Doctrine\Diagnostics\Helpers AS KdybyHelpers;
  * @author Patrik Votoček
  * @author Filip Procházka <filip@prochazka.su>
  */
-class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQLLogger
+class Panel implements IBarPanel, Doctrine\DBAL\Logging\SQLLogger
 {
 
 	/**

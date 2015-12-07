@@ -7,12 +7,10 @@
  */
 namespace Esports\Doctrine\Diagnostics;
 
-use Nette;
-
 /**
  * @author Martin Štekl <martin.stekl@gmail.com>
  */
-class SimpleParameterFormatter extends Nette\Object
+class SimpleParameterFormatter
 {
 
 	/**
