@@ -5,19 +5,20 @@
  *
  * Copyright (c) 2008 Filip Procházka (filip@prochazka.su)
  */
-
-namespace Esports\Doctrine;
+namespace Esports\Doctrine\Diagnostics;
 
 /**
  * @author Filip Procházka <filip@prochazka.su>
  */
-class Helpers {
+class Helpers
+{
 
 	/**
 	 * @param \ReflectionProperty $property
 	 * @return int
 	 */
-	public static function getPropertyLine(\ReflectionProperty $property) {
+	public static function getPropertyLine(\ReflectionProperty $property)
+	{
 		$class = $property->getDeclaringClass();
 
 		$context = 'file';
@@ -52,7 +53,8 @@ class Helpers {
 	 *
 	 * @return array
 	 */
-	public static function zipper(array $one, array $two) {
+	public static function zipper(array $one, array $two)
+	{
 		$output = array();
 		while ($one && $two) {
 			$output[] = array_shift($one);
@@ -61,5 +63,4 @@ class Helpers {
 
 		return array_merge($output, $one ? : array(), $two ? : array());
 	}
-
 }

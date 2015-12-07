@@ -5,7 +5,6 @@
  *
  * Copyright (c) 2008 Filip Procházka (filip@prochazka.su)
  */
-
 namespace Esports\Doctrine\Diagnostics;
 
 use Doctrine;
@@ -22,7 +21,7 @@ use Tracy\BlueScreen;
 use Tracy\Debugger;
 use Tracy\Helpers;
 use Tracy\IBarPanel;
-use Esports\Doctrine\Helpers AS KdybyHelpers;
+use Esports\Doctrine\Diagnostics\Helpers AS KdybyHelpers;
 
 /**
  * Debug panel for Doctrine
@@ -31,7 +30,8 @@ use Esports\Doctrine\Helpers AS KdybyHelpers;
  * @author Patrik Votoček
  * @author Filip Procházka <filip@prochazka.su>
  */
-class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQLLogger {
+class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQLLogger
+{
 
 	/**
 	 * @var int logged time
@@ -67,7 +67,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param \Doctrine\DBAL\Connection $connection
 	 * @throws \Nette\InvalidStateException
 	 */
-	public function setConnection(Doctrine\DBAL\Connection $connection) {
+	public function setConnection(Doctrine\DBAL\Connection $connection)
+	{
 		if ($this->connection !== NULL) {
 			throw new Nette\InvalidStateException("Doctrine Panel is already bound to connection.");
 		}
@@ -80,7 +81,6 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 
 		$this->connection = $connection;
 	}
-
 	/*	 * *************** Doctrine\DBAL\Logging\SQLLogger ******************* */
 
 	/**
@@ -88,7 +88,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param array
 	 * @param array
 	 */
-	public function startQuery($sql, array $params = NULL, array $types = NULL) {
+	public function startQuery($sql, array $params = NULL, array $types = NULL)
+	{
 		Debugger::timer('doctrine');
 
 		$source = NULL;
@@ -116,7 +117,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param string $file
 	 * @return boolean
 	 */
-	protected function filterTracePaths($file) {
+	protected function filterTracePaths($file)
+	{
 		$file = str_replace(DIRECTORY_SEPARATOR, '/', $file);
 		$return = is_file($file);
 		foreach ($this->skipPaths as $path) {
@@ -131,7 +133,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	/**
 	 * @return array
 	 */
-	public function stopQuery() {
+	public function stopQuery()
+	{
 		$keys = array_keys($this->queries);
 		$key = end($keys);
 		$this->queries[$key][2] = $time = Debugger::timer('doctrine');
@@ -143,27 +146,29 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	/**
 	 * @param \Exception $exception
 	 */
-	public function queryFailed(\Exception $exception) {
+	public function queryFailed(\Exception $exception)
+	{
 		$this->failed[spl_object_hash($exception)] = $this->stopQuery();
 	}
-
 	/*	 * *************** Tracy\IBarPanel ******************* */
 
 	/**
 	 * @return string
 	 */
-	public function getTab() {
+	public function getTab()
+	{
 		return '<span title="Doctrine 2">'
-				. '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAEYSURBVBgZBcHPio5hGAfg6/2+R980k6wmJgsJ5U/ZOAqbSc2GnXOwUg7BESgLUeIQ1GSjLFnMwsKGGg1qxJRmPM97/1zXFAAAAEADdlfZzr26miup2svnelq7d2aYgt3rebl585wN6+K3I1/9fJe7O/uIePP2SypJkiRJ0vMhr55FLCA3zgIAOK9uQ4MS361ZOSX+OrTvkgINSjS/HIvhjxNNFGgQsbSmabohKDNoUGLohsls6BaiQIMSs2FYmnXdUsygQYmumy3Nhi6igwalDEOJEjPKP7CA2aFNK8Bkyy3fdNCg7r9/fW3jgpVJbDmy5+PB2IYp4MXFelQ7izPrhkPHB+P5/PjhD5gCgCenx+VR/dODEwD+A3T7nqbxwf1HAAAAAElFTkSuQmCC" />'
-				. count($this->queries) . ' queries'
-				. ($this->totalTime ? ' / ' . sprintf('%0.1f', $this->totalTime * 1000) . ' ms' : '')
-				. '</span>';
+			. '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAQAAAC1+jfqAAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAAEYSURBVBgZBcHPio5hGAfg6/2+R980k6wmJgsJ5U/ZOAqbSc2GnXOwUg7BESgLUeIQ1GSjLFnMwsKGGg1qxJRmPM97/1zXFAAAAEADdlfZzr26miup2svnelq7d2aYgt3rebl585wN6+K3I1/9fJe7O/uIePP2SypJkiRJ0vMhr55FLCA3zgIAOK9uQ4MS361ZOSX+OrTvkgINSjS/HIvhjxNNFGgQsbSmabohKDNoUGLohsls6BaiQIMSs2FYmnXdUsygQYmumy3Nhi6igwalDEOJEjPKP7CA2aFNK8Bkyy3fdNCg7r9/fW3jgpVJbDmy5+PB2IYp4MXFelQ7izPrhkPHB+P5/PjhD5gCgCenx+VR/dODEwD+A3T7nqbxwf1HAAAAAElFTkSuQmCC" />'
+			. count($this->queries) . ' queries'
+			. ($this->totalTime ? ' / ' . sprintf('%0.1f', $this->totalTime * 1000) . ' ms' : '')
+			. '</span>';
 	}
 
 	/**
 	 * @return string
 	 */
-	public function getPanel() {
+	public function getPanel()
+	{
 		if (empty($this->queries)) {
 			return "";
 		}
@@ -177,15 +182,16 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 		);
 
 		return $this->renderStyles() .
-				'<h1>Queries: ' . count($this->queries) . ($this->totalTime ? ', time: ' . sprintf('%0.3f', $this->totalTime * 1000) . ' ms' : '') . ', host: ' . $host . '</h1>' .
-				'<div class="nette-inner tracy-inner nette-Doctrine2Panel">' .
-				'<table><tr><th>ms</th><th>SQL Statement</th></tr>' . $s . '</table></div>';
+			'<h1>Queries: ' . count($this->queries) . ($this->totalTime ? ', time: ' . sprintf('%0.3f', $this->totalTime * 1000) . ' ms' : '') . ', host: ' . $host . '</h1>' .
+			'<div class="nette-inner tracy-inner nette-Doctrine2Panel">' .
+			'<table><tr><th>ms</th><th>SQL Statement</th></tr>' . $s . '</table></div>';
 	}
 
 	/**
 	 * @return string
 	 */
-	protected function renderStyles() {
+	protected function renderStyles()
+	{
 		return '<style> #nette-debug td.nette-Doctrine2Panel-sql { background: white !important}
 			#nette-debug .nette-Doctrine2Panel-source { color: #BBB !important }
 			#nette-debug nette-Doctrine2Panel tr table { margin: 8px 0; max-height: 150px; overflow:auto } </style>';
@@ -195,7 +201,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param array
 	 * @return string
 	 */
-	protected function processQuery(array $query) {
+	protected function processQuery(array $query)
+	{
 		$h = 'htmlspecialchars';
 		list($sql, $params, $time, $types, $source) = $query;
 
@@ -205,16 +212,16 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 		}
 
 		return '<tr><td>' . sprintf('%0.3f', $time * 1000) . '</td>' .
-				'<td class = "nette-Doctrine2Panel-sql">' . $s . '</td></tr>';
+			'<td class = "nette-Doctrine2Panel-sql">' . $s . '</td></tr>';
 	}
-
 	/*	 * **************** Exceptions handling ******************** */
 
 	/**
 	 * @param \Exception $e
 	 * @return void|array
 	 */
-	public function renderQueryException($e) {
+	public function renderQueryException($e)
+	{
 		if ($e instanceof \PDOException && count($this->queries)) {
 			$types = $params = array();
 
@@ -258,7 +265,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param \Nette\DI\Container $dic
 	 * @return array
 	 */
-	public static function renderException($e, Nette\DI\Container $dic) {
+	public static function renderException($e, Nette\DI\Container $dic)
+	{
 		if ($e instanceof AnnotationException) {
 			if ($dump = self::highlightAnnotationLine($e)) {
 				return array(
@@ -331,7 +339,7 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 			return isset($sql) ? array(
 				'tab' => 'SQL',
 				'panel' => self::highlightQuery(static::formatQuery($sql, $params, array())),
-					) : NULL;
+				) : NULL;
 		}
 
 		return NULL;
@@ -345,7 +353,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 *
 	 * @return array
 	 */
-	protected function dumpQuery($query, $params, array $types = array(), $source = NULL) {
+	protected function dumpQuery($query, $params, array $types = array(), $source = NULL)
+	{
 		if ($params instanceof ArrayCollection) {
 			$tmp = array();
 			$tmpTypes = array();
@@ -384,7 +393,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param string $sql
 	 * @return string
 	 */
-	public static function highlightQuery($sql) {
+	public static function highlightQuery($sql)
+	{
 		static $keywords1 = 'SELECT|(?:ON\s+DUPLICATE\s+KEY)?UPDATE|INSERT(?:\s+INTO)?|REPLACE(?:\s+INTO)?|DELETE|CALL|UNION|FROM|WHERE|HAVING|GROUP\s+BY|ORDER\s+BY|LIMIT|OFFSET|SET|VALUES|LEFT\s+JOIN|INNER\s+JOIN|TRUNCATE';
 		static $keywords2 = 'ALL|DISTINCT|DISTINCTROW|IGNORE|AS|USING|ON|AND|OR|IN|IS|NOT|NULL|[RI]?LIKE|REGEXP|TRUE|FALSE|WITH|INSTANCE\s+OF';
 
@@ -424,7 +434,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @throws \Nette\Utils\RegexpException
 	 * @return string
 	 */
-	public static function formatQuery($query, $params, array $types = array(), AbstractPlatform $platform = NULL) {
+	public static function formatQuery($query, $params, array $types = array(), AbstractPlatform $platform = NULL)
+	{
 		if (!$platform) {
 			$platform = new Doctrine\DBAL\Platforms\MySqlPlatform();
 		}
@@ -442,7 +453,7 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 		try {
 			list($query, $params, $types) = \Doctrine\DBAL\SQLParserUtils::expandListParameters($query, $params, $types);
 		} catch (Doctrine\DBAL\SQLParserUtilsException $e) {
-
+			
 		}
 
 		$formattedParams = array();
@@ -472,22 +483,22 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 		}
 
 		return Strings::replace($query, '~(\\:[a-z][a-z0-9]*|\\?[0-9]*)~i', function ($m) use (&$params) {
-					if (substr($m[0], 0, 1) === '?') {
-						if (strlen($m[0]) > 1) {
-							if (isset($params[$k = substr($m[0], 1)])) {
-								return $params[$k];
-							}
-						} else {
-							return array_shift($params);
-						}
-					} else {
+				if (substr($m[0], 0, 1) === '?') {
+					if (strlen($m[0]) > 1) {
 						if (isset($params[$k = substr($m[0], 1)])) {
 							return $params[$k];
 						}
+					} else {
+						return array_shift($params);
 					}
+				} else {
+					if (isset($params[$k = substr($m[0], 1)])) {
+						return $params[$k];
+					}
+				}
 
-					return $m[0];
-				});
+				return $m[0];
+			});
 	}
 
 	/**
@@ -495,7 +506,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 *
 	 * @return string
 	 */
-	public static function highlightAnnotationLine(AnnotationException $e) {
+	public static function highlightAnnotationLine(AnnotationException $e)
+	{
 		foreach ($e->getTrace() as $step) {
 			if (@$step['class'] . @$step['type'] . @$step['function'] !== 'Doctrine\Common\Annotations\DocParser->parse') {
 				continue;
@@ -536,7 +548,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 *
 	 * @return int|string
 	 */
-	public static function calculateErrorLine(\Reflector $refl, \Exception $e, $startLine = NULL) {
+	public static function calculateErrorLine(\Reflector $refl, \Exception $e, $startLine = NULL)
+	{
 		if ($startLine === NULL) {
 			$startLine = $refl->getStartLine();
 		}
@@ -565,7 +578,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 *
 	 * @return int
 	 */
-	protected static function calculateAffectedLine(\Reflector $refl, $symbolPos) {
+	protected static function calculateAffectedLine(\Reflector $refl, $symbolPos)
+	{
 		$doc = $refl->getDocComment();
 		$cleanedDoc = self::cleanedPhpDoc($refl, $atPos);
 		$beforeCleanLines = count(Strings::split(substr($doc, 0, $atPos), '~[\n\r]+~'));
@@ -579,7 +593,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param \Reflector|Nette\Reflection\ClassType|Nette\Reflection\Method $refl
 	 * @param $annotation
 	 */
-	private static function findRenamed(\Reflector $refl, $annotation) {
+	private static function findRenamed(\Reflector $refl, $annotation)
+	{
 		$parser = new Doctrine\Common\Annotations\PhpParser();
 		$imports = $parser->parseClass($refl instanceof \ReflectionClass ? $refl : $refl->getDeclaringClass());
 
@@ -608,7 +623,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 *
 	 * @return string
 	 */
-	private static function cleanedPhpDoc(\Reflector $refl, &$atPos = NULL) {
+	private static function cleanedPhpDoc(\Reflector $refl, &$atPos = NULL)
+	{
 		return trim(substr($doc = $refl->getDocComment(), $atPos = strpos($doc, '@') - 1), '* /');
 	}
 
@@ -620,17 +636,17 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param string $text
 	 * @return Nette\Utils\Html
 	 */
-	private static function editorLink($file, $line, $text = NULL) {
+	private static function editorLink($file, $line, $text = NULL)
+	{
 		if (Debugger::$editor && is_file($file) && $text !== NULL) {
 			return Nette\Utils\Html::el('a')
-							->href(strtr(Debugger::$editor, array('%file' => rawurlencode($file), '%line' => $line)))
-							->title("$file:$line")
-							->setHtml($text);
+					->href(strtr(Debugger::$editor, array('%file' => rawurlencode($file), '%line' => $line)))
+					->title("$file:$line")
+					->setHtml($text);
 		} else {
 			return Helpers::editorLink($file, $line);
 		}
 	}
-
 	/*	 * **************** Registration ******************** */
 
 	/**
@@ -638,14 +654,16 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 *
 	 * @param \Tracy\Bar $bar
 	 */
-	public function registerBarPanel(Bar $bar) {
+	public function registerBarPanel(Bar $bar)
+	{
 		$bar->addPanel($this);
 	}
 
 	/**
 	 * Registers generic exception renderer
 	 */
-	public static function registerBluescreen(Nette\DI\Container $dic) {
+	public static function registerBluescreen(Nette\DI\Container $dic)
+	{
 		static::getDebuggerBlueScreen()->addPanel(function ($e) use ($dic) {
 			return Panel::renderException($e, $dic);
 		});
@@ -655,7 +673,8 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	 * @param \Doctrine\DBAL\Connection $connection
 	 * @return Panel
 	 */
-	public static function register(Doctrine\DBAL\Connection $connection) {
+	public static function register(Doctrine\DBAL\Connection $connection)
+	{
 		$panel = new static();
 		/** @var Panel $panel */
 		$panel->setConnection($connection);
@@ -668,15 +687,16 @@ class Panel extends Nette\Object implements IBarPanel, Doctrine\DBAL\Logging\SQL
 	/**
 	 * @return Bar
 	 */
-	private static function getDebuggerBar() {
+	private static function getDebuggerBar()
+	{
 		return Debugger::getBar();
 	}
 
 	/**
 	 * @return BlueScreen
 	 */
-	private static function getDebuggerBlueScreen() {
+	private static function getDebuggerBlueScreen()
+	{
 		return Debugger::getBlueScreen();
 	}
-
 }

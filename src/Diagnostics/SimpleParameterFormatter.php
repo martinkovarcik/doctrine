@@ -5,7 +5,6 @@
  *
  * Copyright (c) 2008 Filip Procházka (filip@prochazka.su)
  */
-
 namespace Esports\Doctrine\Diagnostics;
 
 use Nette;
@@ -13,13 +12,15 @@ use Nette;
 /**
  * @author Martin Štekl <martin.stekl@gmail.com>
  */
-class SimpleParameterFormatter extends Nette\Object {
+class SimpleParameterFormatter extends Nette\Object
+{
 
 	/**
 	 * @param mixed $param
 	 * @return mixed
 	 */
-	public static function format($param) {
+	public static function format($param)
+	{
 		if (is_int($param) || is_float($param)) {
 			return $param;
 		} elseif (is_string($param)) {
@@ -43,5 +44,4 @@ class SimpleParameterFormatter extends Nette\Object {
 			return @"'$param'";
 		}
 	}
-
 }
