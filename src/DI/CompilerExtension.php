@@ -1,10 +1,10 @@
 <?php
 
-namespace Esports\Doctrine;
+namespace Esports\Doctrine\DI;
 
 use Doctrine\Common\Proxy\AbstractProxyFactory;
 use Kdyby\DoctrineCache\DI\Helpers as CacheHelpers;
-use Nette\DI\CompilerExtension;
+use Nette\DI\CompilerExtension AS BaseCompilerExtension;
 use Nette\DI\ContainerBuilder;
 use Nette\DI\Helpers;
 use Nette\DI\ServiceDefinition;
@@ -12,7 +12,7 @@ use Nette\PhpGenerator\ClassType;
 use Nette\Utils\AssertionException;
 use Nette\Utils\Validators;
 
-class OrmExtension extends CompilerExtension
+class CompilerExtension extends BaseCompilerExtension
 {
 
 	/**
@@ -27,14 +27,8 @@ class OrmExtension extends CompilerExtension
 		'charset' => 'UTF8',
 		'driver' => 'pdo_mysql',
 		'driverClass' => NULL,
-		'options' => NULL,
-		'path' => NULL,
-		'memory' => NULL,
-		'unix_socket' => NULL,
+		'driverOptions' => NULL,
 		'logging' => '%debugMode%',
-		'platformService' => NULL,
-		'defaultTableOptions' => [],
-		'resultCache' => 'default',
 		'schemaFilter' => NULL,
 		'metadataCache' => 'default',
 		'queryCache' => 'default',
@@ -83,12 +77,22 @@ class OrmExtension extends CompilerExtension
 		$builder->addDefinition($this->prefix('connection'), $this->createConnectionDefinition($config));
 		$builder->addDefinition($this->prefix('em'), $this->createEntityManagerDefinition());
 	}
+	
+	/**
+	 * @inheritDoc
+	 */
+	public function afterCompile(ClassType $class)
+	{
+		$init = $class->methods['initialize'];
+		$init->addBody('Esports\Doctrine\Diagnostics\Panel::registerBluescreen($this);');
+		$init->addBody('Doctrine\Common\Annotations\AnnotationRegistry::registerLoader("class_exists");');
+	}
 
 	/**
 	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	protected function createEventManagerDefinition(array $config)
+	private function createEventManagerDefinition(array $config)
 	{
 		$evm = (new ServiceDefinition)
 			->setClass('Doctrine\Common\EventManager')
@@ -105,7 +109,7 @@ class OrmExtension extends CompilerExtension
 	/**
 	 * @return ServiceDefinition
 	 */
-	protected function createEntityManagerDefinition()
+	private function createEntityManagerDefinition()
 	{
 		return (new ServiceDefinition)
 				->setClass('Doctrine\ORM\EntityManager')
@@ -122,7 +126,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	protected function createConnectionDefinition($config)
+	private function createConnectionDefinition($config)
 	{
 		$connection = (new ServiceDefinition)
 			->setClass('Doctrine\DBAL\Connection')
@@ -140,7 +144,10 @@ class OrmExtension extends CompilerExtension
 				->addSetup('$service->getDatabasePlatform()->registerDoctrineTypeMapping(?, ?)', [$type, $type]);
 		}
 
-		$connection->addSetup('Esports\Doctrine\Diagnostics\Panel::register', ['@self']);
+		if ($config['logging']) {
+			$connection->addSetup('Esports\Doctrine\Diagnostics\Panel::register', ['@self']);
+		}
+			
 		return $connection;
 	}
 
@@ -148,7 +155,7 @@ class OrmExtension extends CompilerExtension
 	 * @param ContainerBuilder $builder
 	 * @param array $metadata
 	 */
-	protected function registerMetadataDrivers(ContainerBuilder $builder, $metadata)
+	private function registerMetadataDrivers(ContainerBuilder $builder, $metadata)
 	{
 		$builder->addDefinition($this->prefix('reader'))
 			->setClass('Doctrine\Common\Annotations\AnnotationReader')
@@ -182,7 +189,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	protected function createConfigurationServiceDefinition(array $config)
+	private function createConfigurationServiceDefinition(array $config)
 	{
 		$configuration = (new ServiceDefinition())
 			->setClass('Doctrine\ORM\Configuration')
@@ -220,7 +227,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $config
 	 * @throws AssertionException
 	 */
-	protected function assertConfig(array $config)
+	private function assertConfig(array $config)
 	{
 		Validators::assertField($config, 'namespaceAlias', 'array');
 		Validators::assertField($config, 'hydrators', 'array');
@@ -251,7 +258,7 @@ class OrmExtension extends CompilerExtension
 	 * @param string $path
 	 * @throws AssertionException
 	 */
-	protected function checkPath($path)
+	private function checkPath($path)
 	{
 		if (($pos = strrpos($path, '*')) !== FALSE) {
 			$path = substr($path, 0, $pos);
@@ -267,7 +274,7 @@ class OrmExtension extends CompilerExtension
 	 * @param string $suffix
 	 * @return string
 	 */
-	protected function processCache($cache, $suffix)
+	private function processCache($cache, $suffix)
 	{
 		return CacheHelpers::processCache($this, $cache, $suffix, $this->getContainerBuilder()->parameters[$this->prefix('debug')]);
 	}
@@ -276,7 +283,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataAnnotationDriver($path)
+	private function createMetadataAnnotationDriver($path)
 	{
 		return $this->createMetadataServiceDefinition()
 				->setClass('Doctrine\ORM\Mapping\Driver\AnnotationDriver', [$this->prefix('@cachedReader'), $path]);
@@ -286,7 +293,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataYmlDriver($path)
+	private function createMetadataYmlDriver($path)
 	{
 		return $this->createMetadataServiceDefinition()
 				->setClass('Doctrine\ORM\Mapping\Driver\YamlDriver', [$path]);
@@ -296,7 +303,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataYamlDriver($path)
+	private function createMetadataYamlDriver($path)
 	{
 		return $this->createMetadataYmlDriver($path);
 	}
@@ -305,7 +312,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataStaticDriver($path)
+	private function createMetadataStaticDriver($path)
 	{
 		return $this->createMetadataServiceDefinition()
 				->setClass('Doctrine\Common\Persistence\Mapping\Driver\StaticPHPDriver', [$path]);
@@ -315,7 +322,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataXmlDriver($path)
+	private function createMetadataXmlDriver($path)
 	{
 		return $this->createMetadataServiceDefinition()
 				->setClass('Doctrine\ORM\Mapping\Driver\XmlDriver', [$path]);
@@ -325,7 +332,7 @@ class OrmExtension extends CompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataDbDriver($path)
+	private function createMetadataDbDriver($path)
 	{
 		return $this->createMetadataServiceDefinition()
 				->setClass('Doctrine\ORM\Mapping\Driver\DatabaseDriver', [$path]);
@@ -334,21 +341,12 @@ class OrmExtension extends CompilerExtension
 	/**
 	 * @return ServiceDefinition
 	 */
-	protected function createMetadataServiceDefinition()
+	private function createMetadataServiceDefinition()
 	{
 		return (new ServiceDefinition())
 				->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriver')
 				->setAutowired(FALSE)
 				->setInject(FALSE);
 	}
-
-	/**
-	 * @inheritDoc
-	 */
-	public function afterCompile(ClassType $class)
-	{
-		$init = $class->methods['initialize'];
-		$init->addBody('Esports\Doctrine\Diagnostics\Panel::registerBluescreen($this);');
-		$init->addBody('Doctrine\Common\Annotations\AnnotationRegistry::registerLoader("class_exists");');
-	}
+	
 }
