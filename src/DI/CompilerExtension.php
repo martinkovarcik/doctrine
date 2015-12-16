@@ -19,17 +19,17 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @var array
 	 */
 	public $defaults = array(
-		'dbname' => NULL,
+		'dbname' => null,
 		'host' => '127.0.0.1',
-		'port' => NULL,
-		'user' => NULL,
-		'password' => NULL,
+		'port' => null,
+		'user' => null,
+		'password' => null,
 		'charset' => 'UTF8',
 		'driver' => 'pdo_mysql',
-		'driverClass' => NULL,
-		'driverOptions' => NULL,
+		'driverClass' => null,
+		'driverOptions' => null,
 		'logging' => '%debugMode%',
-		'schemaFilter' => NULL,
+		'schemaFilter' => null,
 		'metadataCache' => 'default',
 		'queryCache' => 'default',
 		'resultCache' => 'default',
@@ -41,10 +41,10 @@ class CompilerExtension extends BaseCompilerExtension
 		'metadata' => [],
 		'filters' => [],
 		'namespaceAlias' => [],
-		'targetEntityMappings' => [],
-		'entityListenerResolver' => NULL,
-		'namingStrategy' => NULL,
-		'quoteStrategy' => NULL,
+		'targetEntityMapping' => [],
+		'entityListenerResolver' => null,
+		'namingStrategy' => null,
+		'quoteStrategy' => null,
 		'autoGenerateProxyClasses' => '%debugMode%',
 		'eventSubscribers' => []
 	);
@@ -68,12 +68,13 @@ class CompilerExtension extends BaseCompilerExtension
 	{
 		$builder = $this->getContainerBuilder();
 		$config = Helpers::expand($this->getConfig() + $this->defaults, $builder->parameters);
+		$this->setupConfigByExtensions($config);
 		$this->assertConfig($config);
 		$builder->parameters[$this->prefix('debug')] = !empty($config['debug']);
 
 		$this->registerMetadataDrivers($builder, $config['metadata']);
 		$builder->addDefinition($this->prefix('config'), $this->createConfigurationServiceDefinition($config));
-		$builder->addDefinition($this->prefix('evm'), $this->createEventManagerDefinition($config));
+		$builder->addDefinition($this->prefix('evm'), $this->createEventManagerDefinition($builder, $config));
 		$builder->addDefinition($this->prefix('connection'), $this->createConnectionDefinition($config));
 		$builder->addDefinition($this->prefix('em'), $this->createEntityManagerDefinition());
 	}
@@ -87,17 +88,49 @@ class CompilerExtension extends BaseCompilerExtension
 		$init->addBody('Esports\Doctrine\Diagnostics\Panel::registerBluescreen($this);');
 		$init->addBody('Doctrine\Common\Annotations\AnnotationRegistry::registerLoader("class_exists");');
 	}
+	
+	/**
+	 * @param array $config
+	 */
+	private function setupConfigByExtensions(array &$config) {
+		foreach ($this->compiler->getExtensions() as $extension) {
+			if ($extension instanceof EntityProvider) {
+				$metadata = $extension->getEntityMapping();
+				Validators::assert($metadata, 'array');
+				$config['metadata'] = array_merge($config['metadata'], $metadata);
+			}
+
+			if ($extension instanceof TargetEntityProvider) {
+				$targetEntities = $extension->getTargetEntityMapping();
+				Validators::assert($targetEntities, 'array');
+				$config['targetEntityMapping'] = \Nette\Utils\Arrays::mergeTree($config['targetEntityMapping'], $targetEntities);
+			}
+		}
+	}
 
 	/**
+	 * @param ContainerBuilder $builder
 	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	private function createEventManagerDefinition(array $config)
+	private function createEventManagerDefinition($builder, array $config)
 	{
 		$evm = (new ServiceDefinition)
-			->setClass('Doctrine\Common\EventManager')
-			->setAutowired(FALSE)
-			->setInject(FALSE);
+			->setClass(\Doctrine\Common\EventManager::class)
+			->setAutowired(false)
+			->setInject(false);
+		
+		if (count($config['targetEntityMapping'])) {
+			$listener = $builder->addDefinition($this->prefix('resolveTargetEntityListener'))
+				->setClass(\Doctrine\ORM\Tools\ResolveTargetEntityListener::class)
+				->setInject(false);
+
+			foreach ($config['targetEntityMapping'] as $originalEntity => $mapping) {
+				$listener->addSetup('addResolveTargetEntity', array($originalEntity, $mapping['targetEntity'], $mapping));
+			}
+			
+			$evm->addSetup('addEventListener', [\Doctrine\ORM\Events::loadClassMetadata, $listener]);
+		}
 
 		foreach ($config['eventSubscribers'] as $eventSubscriber) {
 			$evm->addSetup('addEventSubscriber', [$eventSubscriber]);
@@ -112,14 +145,14 @@ class CompilerExtension extends BaseCompilerExtension
 	private function createEntityManagerDefinition()
 	{
 		return (new ServiceDefinition)
-				->setClass('Doctrine\ORM\EntityManager')
+				->setClass(\Doctrine\ORM\EntityManager::class)
 				->setFactory('Doctrine\ORM\EntityManager::create', [
 					$this->prefix('@connection'),
 					$this->prefix('@config'),
 					$this->prefix('@evm')
 				])
 				->setAutowired(TRUE)
-				->setInject(FALSE);
+				->setInject(false);
 	}
 
 	/**
@@ -136,7 +169,7 @@ class CompilerExtension extends BaseCompilerExtension
 				$this->prefix('@evm')
 			])
 			->setAutowired(TRUE)
-			->setInject(FALSE);
+			->setInject(false);
 
 		foreach ($config['types'] as $type => $class) {
 			$connection
@@ -159,7 +192,7 @@ class CompilerExtension extends BaseCompilerExtension
 	{
 		$builder->addDefinition($this->prefix('reader'))
 			->setClass('Doctrine\Common\Annotations\AnnotationReader')
-			->setAutowired(FALSE);
+			->setAutowired(false);
 
 		$builder->addDefinition($this->prefix('cachedReader'))
 			->setClass('Doctrine\Common\Annotations\Reader')
@@ -167,12 +200,12 @@ class CompilerExtension extends BaseCompilerExtension
 				$this->prefix('@reader'),
 				$this->prefix('@cache.metadata')
 			])
-			->setInject(FALSE);
+			->setInject(false);
 
 		$metadataDriver = $builder->addDefinition($this->prefix('metadataDriver'))
 			->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriverChain')
-			->setAutowired(FALSE)
-			->setInject(FALSE);
+			->setAutowired(false)
+			->setInject(false);
 
 		foreach ($metadata as $namespace => $driverMetadata) {
 			foreach ($driverMetadata as $driverName => $paths) {
@@ -205,8 +238,8 @@ class CompilerExtension extends BaseCompilerExtension
 			->addSetup('setCustomStringFunctions', [$config['dql']['string']])
 			->addSetup('setCustomNumericFunctions', [$config['dql']['numeric']])
 			->addSetup('setCustomDatetimeFunctions', [$config['dql']['datetime']])
-			->setAutowired(FALSE)
-			->setInject(FALSE);
+			->setAutowired(false)
+			->setInject(false);
 
 		foreach (['entityListenerResolver', 'namingStrategy', 'quoteStrategy'] as $key) {
 			if ($config[$key]) {
@@ -260,7 +293,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function checkPath($path)
 	{
-		if (($pos = strrpos($path, '*')) !== FALSE) {
+		if (($pos = strrpos($path, '*')) !== false) {
 			$path = substr($path, 0, $pos);
 		}
 
@@ -345,8 +378,8 @@ class CompilerExtension extends BaseCompilerExtension
 	{
 		return (new ServiceDefinition())
 				->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriver')
-				->setAutowired(FALSE)
-				->setInject(FALSE);
+				->setAutowired(false)
+				->setInject(false);
 	}
 	
 }
