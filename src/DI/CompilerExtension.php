@@ -105,6 +105,12 @@ class CompilerExtension extends BaseCompilerExtension
 				Validators::assert($targetEntities, 'array');
 				$config['targetEntityMapping'] = \Nette\Utils\Arrays::mergeTree($config['targetEntityMapping'], $targetEntities);
 			}
+
+			if ($extension instanceof EventSubscriberProvider) {
+				$subscribers = $extension->getEventSubscribers();
+				Validators::assert($subscribers, 'array');
+				$config['eventSubscribers'] = array_merge($config['eventSubscribers'], $subscribers);
+			}
 		}
 	}
 
