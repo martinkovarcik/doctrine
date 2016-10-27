@@ -67,7 +67,8 @@ class CompilerExtension extends BaseCompilerExtension
 		'namingStrategy' => null,
 		'quoteStrategy' => null,
 		'autoGenerateProxyClasses' => '%debugMode%',
-		'eventSubscribers' => []
+		'eventSubscribers' => [],
+		'types' => [],
 	);
 	
 	/**
