@@ -69,6 +69,7 @@ class CompilerExtension extends BaseCompilerExtension
 		'autoGenerateProxyClasses' => '%debugMode%',
 		'eventSubscribers' => [],
 		'types' => [],
+		'autowired' => true,
 	);
 	
 	/**
@@ -98,7 +99,7 @@ class CompilerExtension extends BaseCompilerExtension
 		$this->createConfigurationService($config);
 		$this->createEventManager($config);
 		$this->createConnection($config);
-		$this->createEntityManager();
+		$this->createEntityManager($config);
 
 		$this->registerMetadata($config['metadata']);
 		$this->registerEventSubscribers($config['eventSubscribers']);
@@ -218,7 +219,7 @@ class CompilerExtension extends BaseCompilerExtension
 		}
 	}
 
-	private function createEntityManager()
+	private function createEntityManager(array $config)
 	{
 		$entityManager = EntityManager::class;
 
@@ -229,7 +230,7 @@ class CompilerExtension extends BaseCompilerExtension
 			"{$entityManager}::create",
 			[$this->prefix('@connection'), $this->prefix('@config'), $this->prefix('@evm')]
 		);
-		$em->setAutowired(true);
+		$em->setAutowired($config['autowired']);
 		$em->setInject(false);
 	}
 
@@ -250,7 +251,7 @@ class CompilerExtension extends BaseCompilerExtension
 			"$driverManager::getConnection",
 			[$config, $this->prefix('@config'), $this->prefix('@evm')]
 		);
-		$connection->setAutowired(true);
+		$connection->setAutowired($config['autowired']);
 		$connection->setInject(false);
 
 		foreach ($config['types'] as $type => $class) {
@@ -351,6 +352,7 @@ class CompilerExtension extends BaseCompilerExtension
 		Validators::assertField($config, 'metadata', 'array');
 		Validators::assertField($config, 'filters', 'array');
 		Validators::assertField($config, 'eventSubscribers', 'array');
+		Validators::assertField($config, 'autowired', 'bool');
 	}
 
 	private function assertMetadataConfiguration($metadata)
