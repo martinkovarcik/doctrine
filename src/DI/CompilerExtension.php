@@ -2,13 +2,34 @@
 
 namespace Esports\Doctrine\DI;
 
+use Doctrine\Common\Annotations\AnnotationReader;
+use Doctrine\Common\Annotations\AnnotationRegistry;
+use Doctrine\Common\Annotations\CachedReader;
+use Doctrine\Common\Annotations\Reader;
+use Doctrine\Common\EventManager;
+use Doctrine\Common\Persistence\Mapping\Driver\MappingDriver;
+use Doctrine\Common\Persistence\Mapping\Driver\MappingDriverChain;
+use Doctrine\Common\Persistence\Mapping\Driver\StaticPHPDriver;
 use Doctrine\Common\Proxy\AbstractProxyFactory;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Types\Type;
+use Doctrine\ORM\Configuration;
+use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Events;
+use Doctrine\ORM\Mapping\Driver\AnnotationDriver;
+use Doctrine\ORM\Mapping\Driver\DatabaseDriver;
+use Doctrine\ORM\Mapping\Driver\XmlDriver;
+use Doctrine\ORM\Mapping\Driver\YamlDriver;
+use Doctrine\ORM\Tools\ResolveTargetEntityListener;
+use Esports\Doctrine\Diagnostics\Panel;
+use InvalidArgumentException;
 use Kdyby\DoctrineCache\DI\Helpers as CacheHelpers;
-use Nette\DI\CompilerExtension AS BaseCompilerExtension;
-use Nette\DI\ContainerBuilder;
+use Nette\DI\CompilerExtension as BaseCompilerExtension;
 use Nette\DI\Helpers;
 use Nette\DI\ServiceDefinition;
 use Nette\PhpGenerator\ClassType;
+use Nette\Utils\Arrays;
 use Nette\Utils\AssertionException;
 use Nette\Utils\Validators;
 
@@ -53,12 +74,12 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @var array
 	 */
 	private $metadataDriverClasses = [
-		'annotation' => 'createMetadataAnnotationDriver',
-		'static' => 'createMetadataStaticDriver',
-		'yml' => 'createMetadataYmlDriver',
-		'yaml' => 'createMetadataYamlDriver',
-		'xml' => 'createMetadataXmlDriver',
-		'db' => 'createMetadataDbDriver'
+		'annotation',
+		'static',
+		'yml',
+		'yaml',
+		'xml',
+		'db',
 	];
 
 	/**
@@ -72,23 +93,78 @@ class CompilerExtension extends BaseCompilerExtension
 		$this->assertConfig($config);
 		$builder->parameters[$this->prefix('debug')] = !empty($config['debug']);
 
-		$this->registerMetadataDrivers($builder, $config['metadata']);
-		$builder->addDefinition($this->prefix('config'), $this->createConfigurationServiceDefinition($config));
-		$builder->addDefinition($this->prefix('evm'), $this->createEventManagerDefinition($builder, $config));
-		$builder->addDefinition($this->prefix('connection'), $this->createConnectionDefinition($config));
-		$builder->addDefinition($this->prefix('em'), $this->createEntityManagerDefinition());
+		$this->createMetadataDriver();
+		$this->createConfigurationService($config);
+		$this->createEventManager($config);
+		$this->createConnection($config);
+		$this->createEntityManager();
+
+		$this->registerMetadata($config['metadata']);
+		$this->registerEventSubscribers($config['eventSubscribers']);
 	}
-	
+
+	public function registerMetadata(array $metadata)
+	{
+		$builder = $this->getContainerBuilder();
+		$metadataDriver = $builder->getDefinition($this->prefix('metadataDriver'));
+
+		$this->assertMetadataConfiguration($metadata);
+
+		foreach ($metadata as $namespace => $driverMetadata) {
+			foreach ($driverMetadata as $driverName => $paths) {
+				$serviceName = $this->prefix('driver.' . str_replace('\\', '_', $namespace) . ".$driverName.Impl");
+				$driver = $this->createMetadataDriverByType($driverName, (array) $paths);
+				$builder->addDefinition($serviceName, $driver);
+				$metadataDriver->addSetup('addDriver', ['@' . $serviceName, $namespace]);
+			}
+		}
+	}
+
+	public function registerEventSubscribers(array $eventSubscribers)
+	{
+		$builder = $this->getContainerBuilder();
+		$evm = $builder->getDefinition($this->prefix('evm'));
+
+		foreach ($eventSubscribers as $eventSubscriber) {
+			$evm->addSetup('addEventSubscriber', [$eventSubscriber]);
+		}
+	}
+
 	/**
 	 * @inheritDoc
 	 */
 	public function afterCompile(ClassType $class)
 	{
+		$panel = Panel::class;
+		$annotationRegistry = AnnotationRegistry::class;
+
 		$init = $class->methods['initialize'];
-		$init->addBody('Esports\Doctrine\Diagnostics\Panel::registerBluescreen($this);');
-		$init->addBody('Doctrine\Common\Annotations\AnnotationRegistry::registerLoader("class_exists");');
+		$init->addBody("{$panel}::registerBluescreen(\$this);");
+		$init->addBody("{$annotationRegistry}::registerLoader('class_exists');");
 	}
-	
+
+	private function createMetadataDriverByType($type, array $paths)
+	{
+		switch ($type) {
+			case 'annotation':
+				return $this->createMetadataAnnotationDriver($paths);
+			case 'static':
+				return $this->createMetadataStaticDriver($paths);
+			case 'yml':
+				return $this->createMetadataYmlDriver($paths);
+			case 'yaml':
+				return $this->createMetadataYamlDriver($paths);
+			case 'xml':
+				return $this->createMetadataXmlDriver($paths);
+			case 'db':
+				return $this->createMetadataDbDriver($paths);
+			case 'static':
+				return $this->createMetadataAnnotationDriver($paths);
+		}
+
+		throw new InvalidArgumentException;
+	}
+
 	/**
 	 * @param array $config
 	 */
@@ -103,7 +179,7 @@ class CompilerExtension extends BaseCompilerExtension
 			if ($extension instanceof TargetEntityProvider) {
 				$targetEntities = $extension->getTargetEntityMapping();
 				Validators::assert($targetEntities, 'array');
-				$config['targetEntityMapping'] = \Nette\Utils\Arrays::mergeTree($config['targetEntityMapping'], $targetEntities);
+				$config['targetEntityMapping'] = Arrays::mergeTree($config['targetEntityMapping'], $targetEntities);
 			}
 
 			if ($extension instanceof EventSubscriberProvider) {
@@ -115,137 +191,129 @@ class CompilerExtension extends BaseCompilerExtension
 	}
 
 	/**
-	 * @param ContainerBuilder $builder
 	 * @param array $config
-	 * @return ServiceDefinition
 	 */
-	private function createEventManagerDefinition($builder, array $config)
+	private function createEventManager(array $config)
 	{
-		$evm = (new ServiceDefinition)
-			->setClass(\Doctrine\Common\EventManager::class)
-			->setAutowired(false)
-			->setInject(false);
-		
+		$builder = $this->getContainerBuilder();
+		$evm = $builder->addDefinition($this->prefix('evm'));
+		$evm->setClass(EventManager::class);
+		$evm->setAutowired(false);
+		$evm->setInject(false);
+
 		if (count($config['targetEntityMapping'])) {
 			$listener = $builder->addDefinition($this->prefix('resolveTargetEntityListener'))
-				->setClass(\Doctrine\ORM\Tools\ResolveTargetEntityListener::class)
+				->setClass(ResolveTargetEntityListener::class)
 				->setInject(false);
 
 			foreach ($config['targetEntityMapping'] as $originalEntity => $mapping) {
-				$listener->addSetup('addResolveTargetEntity', array($originalEntity, $mapping['targetEntity'], $mapping));
+				$listener->addSetup(
+					'addResolveTargetEntity',
+					[$originalEntity, $mapping['targetEntity'], $mapping]
+				);
 			}
 			
-			$evm->addSetup('addEventListener', [\Doctrine\ORM\Events::loadClassMetadata, $listener]);
+			$evm->addSetup('addEventListener', [Events::loadClassMetadata, $listener]);
 		}
-
-		foreach ($config['eventSubscribers'] as $eventSubscriber) {
-			$evm->addSetup('addEventSubscriber', [$eventSubscriber]);
-		}
-
-		return $evm;
 	}
 
-	/**
-	 * @return ServiceDefinition
-	 */
-	private function createEntityManagerDefinition()
+	private function createEntityManager()
 	{
-		return (new ServiceDefinition)
-				->setClass(\Doctrine\ORM\EntityManager::class)
-				->setFactory('Doctrine\ORM\EntityManager::create', [
-					$this->prefix('@connection'),
-					$this->prefix('@config'),
-					$this->prefix('@evm')
-				])
-				->setAutowired(TRUE)
-				->setInject(false);
+		$entityManager = EntityManager::class;
+
+		$buider = $this->getContainerBuilder();
+		$em = $buider->addDefinition($this->prefix('em'));
+		$em->setClass(EntityManager::class);
+		$em->setFactory(
+			"{$entityManager}::create",
+			[$this->prefix('@connection'), $this->prefix('@config'), $this->prefix('@evm')]
+		);
+		$em->setAutowired(true);
+		$em->setInject(false);
 	}
 
 	/**
 	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	private function createConnectionDefinition($config)
+	private function createConnection($config)
 	{
-		$connection = (new ServiceDefinition)
-			->setClass('Doctrine\DBAL\Connection')
-			->setFactory('Doctrine\DBAL\DriverManager::getConnection', [
-				$config,
-				$this->prefix('@config'),
-				$this->prefix('@evm')
-			])
-			->setAutowired(TRUE)
-			->setInject(false);
+		$driverManager = DriverManager::class;
+		$dbalType = Type::class;
+		$panel = Panel::class;
+
+		$builder = $this->getContainerBuilder();
+		$connection = $builder->addDefinition($this->prefix('connection'));
+		$connection->setClass(Connection::class);
+		$connection->setFactory(
+			"$driverManager::getConnection",
+			[$config, $this->prefix('@config'), $this->prefix('@evm')]
+		);
+		$connection->setAutowired(true);
+		$connection->setInject(false);
 
 		foreach ($config['types'] as $type => $class) {
-			$connection
-				->addSetup('if (!Doctrine\DBAL\Types\Type::hasType(?)) {Doctrine\DBAL\Types\Type::addType(?, ?);}', [$type, $type, $class])
-				->addSetup('$service->getDatabasePlatform()->registerDoctrineTypeMapping(?, ?)', [$type, $type]);
+			$connection->addSetup(
+				'if (!' . $dbalType . '::hasType(?)) {' . $dbalType . '::addType(?, ?);}',
+				[$type, $type, $class]
+			);
+			$connection->addSetup(
+				'$service->getDatabasePlatform()->registerDoctrineTypeMapping(?, ?)',
+				[$type, $type]
+			);
 		}
 
 		if ($config['logging']) {
-			$connection->addSetup('Esports\Doctrine\Diagnostics\Panel::register', ['@self']);
+			$connection->addSetup("$panel::register", ['@self']);
 		}
-			
-		return $connection;
 	}
 
-	/**
-	 * @param ContainerBuilder $builder
-	 * @param array $metadata
-	 */
-	private function registerMetadataDrivers(ContainerBuilder $builder, $metadata)
+	private function createMetadataDriver()
 	{
-		$builder->addDefinition($this->prefix('reader'))
-			->setClass('Doctrine\Common\Annotations\AnnotationReader')
-			->setAutowired(false);
+		$builder = $this->getContainerBuilder();
+		$reader = $builder->addDefinition($this->prefix('reader'));
+		$reader->setClass(AnnotationReader::class);
+		$reader->setAutowired(false);
 
-		$builder->addDefinition($this->prefix('cachedReader'))
-			->setClass('Doctrine\Common\Annotations\Reader')
-			->setFactory('Doctrine\Common\Annotations\CachedReader', [
-				$this->prefix('@reader'),
-				$this->prefix('@cache.metadata')
-			])
-			->setInject(false);
+		$cachedReader = $builder->addDefinition($this->prefix('cachedReader'));
+		$cachedReader->setClass(Reader::class);
+		$cachedReader->setFactory(
+			CachedReader::class,
+			[$this->prefix('@reader'), $this->prefix('@cache.metadata')]
+		);
+		$cachedReader->setInject(false);
 
-		$metadataDriver = $builder->addDefinition($this->prefix('metadataDriver'))
-			->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriverChain')
-			->setAutowired(false)
-			->setInject(false);
-
-		foreach ($metadata as $namespace => $driverMetadata) {
-			foreach ($driverMetadata as $driverName => $paths) {
-				$serviceName = $this->prefix('driver.' . str_replace('\\', '_', $namespace) . ".$driverName.Impl");
-				$callback = [$this, $this->metadataDriverClasses[$driverName]];
-				$driver = $callback((array) $paths);
-				$builder->addDefinition($serviceName, $driver);
-				$metadataDriver->addSetup('addDriver', ['@' . $serviceName, $namespace]);
-			}
-		}
+		$metadataDriver = $builder->addDefinition($this->prefix('metadataDriver'));
+		$metadataDriver->setClass(MappingDriverChain::class);
+		$metadataDriver->setAutowired(false);
+		$metadataDriver->setInject(false);
 	}
 
 	/**
 	 * @param array $config
-	 * @return ServiceDefinition
 	 */
-	private function createConfigurationServiceDefinition(array $config)
+	private function createConfigurationService(array $config)
 	{
-		$configuration = (new ServiceDefinition())
-			->setClass('Doctrine\ORM\Configuration')
-			->addSetup('setMetadataCacheImpl', [$this->processCache($config['metadataCache'], 'metadata')])
-			->addSetup('setQueryCacheImpl', [$this->processCache($config['queryCache'], 'query')])
-			->addSetup('setResultCacheImpl', [$this->processCache($config['resultCache'], 'ormResult')])
-			->addSetup('setHydrationCacheImpl', [$this->processCache($config['hydrationCache'], 'hydration')])
-			->addSetup('setMetadataDriverImpl', [$this->prefix('@metadataDriver')])
-			->addSetup('setProxyDir', [$config['proxyDir']])
-			->addSetup('setProxyNamespace', [$config['proxyNamespace']])
-			->addSetup('setEntityNamespaces', [$config['namespaceAlias']])
-			->addSetup('setCustomHydrationModes', [$config['hydrators']])
-			->addSetup('setCustomStringFunctions', [$config['dql']['string']])
-			->addSetup('setCustomNumericFunctions', [$config['dql']['numeric']])
-			->addSetup('setCustomDatetimeFunctions', [$config['dql']['datetime']])
-			->setAutowired(false)
-			->setInject(false);
+		$builder = $this->getContainerBuilder();
+		$configuration = $builder->addDefinition($this->prefix('config'));
+		$configuration->setClass(Configuration::class);
+		$configuration->addSetup('setMetadataCacheImpl', [$this->processCache($config['metadataCache'], 'metadata')]);
+		$configuration->addSetup('setQueryCacheImpl', [$this->processCache($config['queryCache'], 'query')]);
+		$configuration->addSetup('setResultCacheImpl', [$this->processCache($config['resultCache'], 'ormResult')]);
+		$configuration->addSetup(
+			'setHydrationCacheImpl',
+			[$this->processCache($config['hydrationCache'], 'hydration')]
+		);
+		$configuration->addSetup('setMetadataDriverImpl', [$this->prefix('@metadataDriver')]);
+		$configuration->addSetup('setProxyDir', [$config['proxyDir']]);
+		$configuration->addSetup('setProxyNamespace', [$config['proxyNamespace']]);
+		$configuration->addSetup('setEntityNamespaces', [$config['namespaceAlias']]);
+		$configuration->addSetup('setCustomHydrationModes', [$config['hydrators']]);
+		$configuration->addSetup('setCustomStringFunctions', [$config['dql']['string']]);
+		$configuration->addSetup('setCustomNumericFunctions', [$config['dql']['numeric']]);
+		$configuration->addSetup('setCustomDatetimeFunctions', [$config['dql']['datetime']]);
+		$configuration->setAutowired(false);
+		$configuration->setInject(false);
 
 		foreach (['entityListenerResolver', 'namingStrategy', 'quoteStrategy'] as $key) {
 			if ($config[$key]) {
@@ -257,9 +325,14 @@ class CompilerExtension extends BaseCompilerExtension
 			$configuration->addSetup('addFilter', [$name, $class]);
 		}
 
-		$autoGenerateProxyClasses = is_bool($config['autoGenerateProxyClasses']) ? ($config['autoGenerateProxyClasses'] ? AbstractProxyFactory::AUTOGENERATE_ALWAYS : AbstractProxyFactory::AUTOGENERATE_FILE_NOT_EXISTS) : $config['autoGenerateProxyClasses'];
+		if (is_bool($config['autoGenerateProxyClasses'])) {
+			$autoGenerateProxyClasses = $config['autoGenerateProxyClasses']
+				? AbstractProxyFactory::AUTOGENERATE_ALWAYS : AbstractProxyFactory::AUTOGENERATE_FILE_NOT_EXISTS;
+		} else {
+			$autoGenerateProxyClasses = $config['autoGenerateProxyClasses'];
+		}
+
 		$configuration->addSetup('setAutoGenerateProxyClasses', [$autoGenerateProxyClasses]);
-		return $configuration;
 	}
 
 	/**
@@ -277,13 +350,19 @@ class CompilerExtension extends BaseCompilerExtension
 		Validators::assertField($config, 'metadata', 'array');
 		Validators::assertField($config, 'filters', 'array');
 		Validators::assertField($config, 'eventSubscribers', 'array');
+	}
 
-		foreach ($config['metadata'] as $driver) {
+	private function assertMetadataConfiguration($metadata)
+	{
+		foreach ($metadata as $driver) {
 			Validators::assert($driver, 'array');
 
 			foreach ($driver as $driverName => $paths) {
-				if (!isset($this->metadataDriverClasses[$driverName])) {
-					throw new AssertionException("Wrong metadata driver $driverName. Allowed drivers are " . implode(', ', array_keys($this->metadataDriverClasses)) . '.');
+				if (!in_array($driverName, $this->metadataDriverClasses, true)) {
+					throw new AssertionException(
+						"Wrong metadata driver $driverName. Allowed drivers are " .
+						implode(', ', $this->metadataDriverClasses) . '.'
+					);
 				}
 
 				foreach ((array) $paths as $path) {
@@ -315,7 +394,12 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function processCache($cache, $suffix)
 	{
-		return CacheHelpers::processCache($this, $cache, $suffix, $this->getContainerBuilder()->parameters[$this->prefix('debug')]);
+		return CacheHelpers::processCache(
+			$this,
+			$cache,
+			$suffix,
+			$this->getContainerBuilder()->parameters[$this->prefix('debug')]
+		);
 	}
 
 	/**
@@ -324,8 +408,10 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function createMetadataAnnotationDriver($path)
 	{
-		return $this->createMetadataServiceDefinition()
-				->setClass('Doctrine\ORM\Mapping\Driver\AnnotationDriver', [$this->prefix('@cachedReader'), $path]);
+		return $this->createMetadataServiceDefinition()->setClass(
+			AnnotationDriver::class,
+			[$this->prefix('@cachedReader'), $path]
+		);
 	}
 
 	/**
@@ -334,8 +420,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function createMetadataYmlDriver($path)
 	{
-		return $this->createMetadataServiceDefinition()
-				->setClass('Doctrine\ORM\Mapping\Driver\YamlDriver', [$path]);
+		return $this->createMetadataServiceDefinition()->setClass(YamlDriver::class, [$path]);
 	}
 
 	/**
@@ -353,8 +438,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function createMetadataStaticDriver($path)
 	{
-		return $this->createMetadataServiceDefinition()
-				->setClass('Doctrine\Common\Persistence\Mapping\Driver\StaticPHPDriver', [$path]);
+		return $this->createMetadataServiceDefinition()->setClass(StaticPHPDriver::class, [$path]);
 	}
 
 	/**
@@ -363,8 +447,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function createMetadataXmlDriver($path)
 	{
-		return $this->createMetadataServiceDefinition()
-				->setClass('Doctrine\ORM\Mapping\Driver\XmlDriver', [$path]);
+		return $this->createMetadataServiceDefinition()->setClass(XmlDriver::class, [$path]);
 	}
 
 	/**
@@ -373,8 +456,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function createMetadataDbDriver($path)
 	{
-		return $this->createMetadataServiceDefinition()
-				->setClass('Doctrine\ORM\Mapping\Driver\DatabaseDriver', [$path]);
+		return $this->createMetadataServiceDefinition()->setClass(DatabaseDriver::class, [$path]);
 	}
 
 	/**
@@ -382,10 +464,11 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private function createMetadataServiceDefinition()
 	{
-		return (new ServiceDefinition())
-				->setClass('Doctrine\Common\Persistence\Mapping\Driver\MappingDriver')
-				->setAutowired(false)
-				->setInject(false);
+		$definition = new ServiceDefinition();
+		$definition->setClass(MappingDriver::class);
+		$definition->setAutowired(false);
+		$definition->setInject(false);
+		return $definition;
 	}
 	
 }
