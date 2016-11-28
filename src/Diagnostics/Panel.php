@@ -310,10 +310,10 @@ class Panel implements IBarPanel, Doctrine\DBAL\Logging\SQLLogger
 					BlueScreen::highlightFile($file, $errorLine),
 				);
 			}
-		} elseif ($e instanceof \Doctrine\DBAL\DBALException && $e->query) {
+		} elseif ($e instanceof \Doctrine\DBAL\DBALException) {
 			return array(
 				'tab' => 'SQL',
-				'panel' => self::highlightQuery(static::formatQuery($e->query, $e->params, array())),
+				'panel' => $e->getMessage(),
 			);
 		} elseif ($e instanceof Doctrine\ORM\Query\QueryException) {
 			if (($prev = $e->getPrevious()) && preg_match('~^(SELECT|INSERT|UPDATE|DELETE)\s+.*~i', $prev->getMessage())) {
