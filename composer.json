@@ -12,17 +12,14 @@
 		"php": ">=5.6",
 		"nette/utils": "~2.3",
 		"nette/di": "~2.3",
-		"tracy/tracy": "~2.3",
-		"doctrine/orm": "~2.5",
-		"kdyby/doctrine-cache": "~2.4"
+		"doctrine/orm": "~2.5"
 	},
 	"require-dev": {
-		"nette/robot-loader": "*",
 		"nette/tester": "*"
 	},
 	"autoload": {
 		"psr-4": {
-            "Esports\\Doctrine\\": "src/"
+            "ESports\\Doctrine\\": "src/"
         }
 	}
 }
