@@ -2,7 +2,7 @@
 
 namespace Test;
 
-use Esports\Doctrine\DI\CompilerExtension;
+use ESports\Doctrine\DI\CompilerExtension;
 use Nette\DI\Compiler;
 use Nette\DI\ContainerBuilder;
 use Tester;
@@ -17,16 +17,16 @@ class CompilerExtensionTest extends Tester\TestCase
 	{
 		$containerBuilder = new ContainerBuilder;
 		$containerBuilder->parameters = [
-			'debugMode' => true,
 			'tempDir' => __DIR__,
 		];
 		$compiler = new Compiler($containerBuilder);
+		$compiler->addExtension('doctrine', new CompilerExtension);
 
-		Assert::noError(function () use ($compiler) {
-			$compilerExtension = new CompilerExtension;
-			$compilerExtension->setCompiler($compiler, 'doctrine');
-			$compilerExtension->loadConfiguration();
-		});
+		Assert::noError(
+			function () use ($compiler) {
+				$compiler->compile();
+			}
+		);
 	}
 }
 
