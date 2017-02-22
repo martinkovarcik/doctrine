@@ -1,38 +1,65 @@
-# esports/nette-doctrine #
+# Doctrine ORM Nette integration #
 
-Rozšíření pro integraci Doctrine ORM do Nette Framework
+Extension, that registers Doctrine ORM into DI Container.
 
-# Konfigurace #
-
-## Registrace rozšíření ##
+## Extension registration ##
 
 ```
 extensions:
-	doctrine: Esports\Doctrine\OrmExtension
+    doctrine: ESports\Doctrine\DI\CompilerExtension
 ```
 
-## Nastavení parametrů ##
+## Extension configuration ###
+
+### Default extension configuration ###
 ```
 doctrine:
-	user: username
-	password: somepassword
-	dbname: databasename
-	metadata:
-		NamespaceName:
-			DriverName:
-				- PathToDomainObjects
-				- AnotherPathToDomainObjects
+    connection:
+        dbname: null
+        host: null
+        port: null
+        user: null
+        password: null
+        charset: UTF8
+        driver: null
+        driverClass: null
+        driverOptions: null
+        server_version: null
+    dbal:
+        types: []
+    orm:
+        dql:
+            string: []
+            numeric: []
+            datetime: []
+        eventManager:
+            subscribers: []
+        metadata:
+            drivers: []
+        proxy:
+            autoGenerateProxyClasses: false,
+            proxyDir: '%tempDir%/proxy',
+            proxyNamespace: DoctrineProxy,
+        cache:
+            metadata: null
+            query: null
+            result: null
+            hydration: null
 
-		SecondNamespaceName:
-			DriverName:
-				- PathToDomainObjects
+    autowired: true
 ```
 
-Jako parametr DriverName je možné využít parametry:
+### Metadata configuration example ###
 
-* annotation (pro čtení anotací z doménového objektu)
-* xml
-* yml
-* yaml
-* db
-* static
+Drivers expect key - value map. Key is namespace of entities.
+Value is a mapping driver. Drive must be an is instance of *Doctrine\Common\Persistence\Mapping\Driver\MappingDriver*.
+
+```
+yamlDriver: Doctrine\ORM\Mapping\Driver\YamlDriver(%pathToMetadata%)
+
+doctrine:
+    orm:
+        metadata:
+            drivers:
+                EntityNamespace: @yamlDriver
+```
