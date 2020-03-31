@@ -9,12 +9,12 @@
 		}
 	],
 	"require": {
-		"php": ">=5.6",
-		"nette/utils": "~2.3",
-		"nette/di": "~2.3",
+		"php": ">=7.1",
+		"nette/utils": "3.1.*",
+		"nette/di": "3.0.*",
 		"tracy/tracy": "~2.3",
 		"doctrine/orm": "~2.5",
-		"kdyby/doctrine-cache": "~2.4"
+		"kdyby/doctrine-cache": "3.0.*"
 	},
 	"require-dev": {
 		"nette/robot-loader": "*",

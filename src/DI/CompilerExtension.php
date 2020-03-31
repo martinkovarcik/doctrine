@@ -26,6 +26,7 @@ use Esports\Doctrine\Diagnostics\Panel;
 use InvalidArgumentException;
 use Kdyby\DoctrineCache\DI\Helpers as CacheHelpers;
 use Nette\DI\CompilerExtension as BaseCompilerExtension;
+use Nette\DI\Extensions\InjectExtension;
 use Nette\DI\Helpers;
 use Nette\DI\ServiceDefinition;
 use Nette\PhpGenerator\ClassType;
@@ -33,45 +34,44 @@ use Nette\Utils\Arrays;
 use Nette\Utils\AssertionException;
 use Nette\Utils\Validators;
 
-class CompilerExtension extends BaseCompilerExtension
-{
+class CompilerExtension extends BaseCompilerExtension {
 
 	/**
 	 * @var array
 	 */
-	public $defaults = array(
-		'dbname' => null,
-		'host' => '127.0.0.1',
-		'port' => null,
-		'user' => null,
-		'password' => null,
-		'charset' => 'UTF8',
-		'driver' => 'pdo_mysql',
-		'driverClass' => null,
-		'driverOptions' => null,
-		'logging' => '%debugMode%',
-		'schemaFilter' => null,
-		'metadataCache' => 'default',
-		'queryCache' => 'default',
-		'resultCache' => 'default',
-		'hydrationCache' => 'default',
-		'proxyDir' => '%tempDir%/proxies',
-		'proxyNamespace' => 'DoctrineProxies',
-		'dql' => array('string' => [], 'numeric' => [], 'datetime' => []),
-		'hydrators' => [],
-		'metadata' => [],
-		'filters' => [],
-		'namespaceAlias' => [],
-		'targetEntityMapping' => [],
-		'entityListenerResolver' => null,
-		'namingStrategy' => null,
-		'quoteStrategy' => null,
+	public $defaults = [
+		'dbname'                   => NULL,
+		'host'                     => '127.0.0.1',
+		'port'                     => NULL,
+		'user'                     => NULL,
+		'password'                 => NULL,
+		'charset'                  => 'UTF8',
+		'driver'                   => 'pdo_mysql',
+		'driverClass'              => NULL,
+		'driverOptions'            => NULL,
+		'logging'                  => '%debugMode%',
+		'schemaFilter'             => NULL,
+		'metadataCache'            => 'default',
+		'queryCache'               => 'default',
+		'resultCache'              => 'default',
+		'hydrationCache'           => 'default',
+		'proxyDir'                 => '%tempDir%/proxies',
+		'proxyNamespace'           => 'DoctrineProxies',
+		'dql'                      => ['string' => [], 'numeric' => [], 'datetime' => []],
+		'hydrators'                => [],
+		'metadata'                 => [],
+		'filters'                  => [],
+		'namespaceAlias'           => [],
+		'targetEntityMapping'      => [],
+		'entityListenerResolver'   => NULL,
+		'namingStrategy'           => NULL,
+		'quoteStrategy'            => NULL,
 		'autoGenerateProxyClasses' => '%debugMode%',
-		'eventSubscribers' => [],
-		'types' => [],
-		'autowired' => true,
-	);
-	
+		'eventSubscribers'         => [],
+		'types'                    => [],
+		'autowired'                => TRUE,
+	];
+
 	/**
 	 * @var array
 	 */
@@ -87,8 +87,7 @@ class CompilerExtension extends BaseCompilerExtension
 	/**
 	 * @inheritDoc
 	 */
-	public function loadConfiguration()
-	{
+	public function loadConfiguration() {
 		$builder = $this->getContainerBuilder();
 		$config = Helpers::expand($this->getConfig() + $this->defaults, $builder->parameters);
 		$this->setupConfigByExtensions($config);
@@ -105,8 +104,7 @@ class CompilerExtension extends BaseCompilerExtension
 		$this->registerEventSubscribers($config['eventSubscribers']);
 	}
 
-	public function registerMetadata(array $metadata)
-	{
+	public function registerMetadata(array $metadata) {
 		$builder = $this->getContainerBuilder();
 		$metadataDriver = $builder->getDefinition($this->prefix('metadataDriver'));
 
@@ -122,8 +120,7 @@ class CompilerExtension extends BaseCompilerExtension
 		}
 	}
 
-	public function registerEventSubscribers(array $eventSubscribers)
-	{
+	public function registerEventSubscribers(array $eventSubscribers) {
 		$builder = $this->getContainerBuilder();
 		$evm = $builder->getDefinition($this->prefix('evm'));
 
@@ -135,8 +132,7 @@ class CompilerExtension extends BaseCompilerExtension
 	/**
 	 * @inheritDoc
 	 */
-	public function afterCompile(ClassType $class)
-	{
+	public function afterCompile(ClassType $class) {
 		$panel = Panel::class;
 		$annotationRegistry = AnnotationRegistry::class;
 
@@ -145,8 +141,7 @@ class CompilerExtension extends BaseCompilerExtension
 		$init->addBody("{$annotationRegistry}::registerLoader('class_exists');");
 	}
 
-	private function createMetadataDriverByType($type, array $paths)
-	{
+	private function createMetadataDriverByType($type, array $paths) {
 		switch ($type) {
 			case 'annotation':
 				return $this->createMetadataAnnotationDriver($paths);
@@ -195,18 +190,17 @@ class CompilerExtension extends BaseCompilerExtension
 	/**
 	 * @param array $config
 	 */
-	private function createEventManager(array $config)
-	{
+	private function createEventManager(array $config) {
 		$builder = $this->getContainerBuilder();
 		$evm = $builder->addDefinition($this->prefix('evm'));
 		$evm->setClass(EventManager::class);
-		$evm->setAutowired(false);
-		$evm->setInject(false);
+		$evm->setAutowired(FALSE);
+		$evm->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		if (count($config['targetEntityMapping'])) {
 			$listener = $builder->addDefinition($this->prefix('resolveTargetEntityListener'))
 				->setClass(ResolveTargetEntityListener::class)
-				->setInject(false);
+				->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 			foreach ($config['targetEntityMapping'] as $originalEntity => $mapping) {
 				$listener->addSetup(
@@ -214,13 +208,12 @@ class CompilerExtension extends BaseCompilerExtension
 					[$originalEntity, $mapping['targetEntity'], $mapping]
 				);
 			}
-			
+
 			$evm->addSetup('addEventListener', [Events::loadClassMetadata, $listener]);
 		}
 	}
 
-	private function createEntityManager(array $config)
-	{
+	private function createEntityManager(array $config) {
 		$entityManager = EntityManager::class;
 
 		$buider = $this->getContainerBuilder();
@@ -231,15 +224,14 @@ class CompilerExtension extends BaseCompilerExtension
 			[$this->prefix('@connection'), $this->prefix('@config'), $this->prefix('@evm')]
 		);
 		$em->setAutowired($config['autowired']);
-		$em->setInject(false);
+		$em->addTag(InjectExtension::TAG_INJECT, FALSE);
 	}
 
 	/**
 	 * @param array $config
 	 * @return ServiceDefinition
 	 */
-	private function createConnection($config)
-	{
+	private function createConnection($config) {
 		$driverManager = DriverManager::class;
 		$dbalType = Type::class;
 		$panel = Panel::class;
@@ -252,7 +244,7 @@ class CompilerExtension extends BaseCompilerExtension
 			[$config, $this->prefix('@config'), $this->prefix('@evm')]
 		);
 		$connection->setAutowired($config['autowired']);
-		$connection->setInject(false);
+		$connection->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		foreach ($config['types'] as $type => $class) {
 			$connection->addSetup(
@@ -270,12 +262,11 @@ class CompilerExtension extends BaseCompilerExtension
 		}
 	}
 
-	private function createMetadataDriver()
-	{
+	private function createMetadataDriver() {
 		$builder = $this->getContainerBuilder();
 		$reader = $builder->addDefinition($this->prefix('reader'));
 		$reader->setClass(AnnotationReader::class);
-		$reader->setAutowired(false);
+		$reader->setAutowired(FALSE);
 
 		$cachedReader = $builder->addDefinition($this->prefix('cachedReader'));
 		$cachedReader->setClass(Reader::class);
@@ -283,19 +274,18 @@ class CompilerExtension extends BaseCompilerExtension
 			CachedReader::class,
 			[$this->prefix('@reader'), $this->prefix('@cache.metadata')]
 		);
-		$cachedReader->setInject(false);
+		$cachedReader->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		$metadataDriver = $builder->addDefinition($this->prefix('metadataDriver'));
 		$metadataDriver->setClass(MappingDriverChain::class);
-		$metadataDriver->setAutowired(false);
-		$metadataDriver->setInject(false);
+		$metadataDriver->setAutowired(FALSE);
+		$metadataDriver->addTag(InjectExtension::TAG_INJECT, FALSE);
 	}
 
 	/**
 	 * @param array $config
 	 */
-	private function createConfigurationService(array $config)
-	{
+	private function createConfigurationService(array $config) {
 		$builder = $this->getContainerBuilder();
 		$configuration = $builder->addDefinition($this->prefix('config'));
 		$configuration->setClass(Configuration::class);
@@ -314,8 +304,8 @@ class CompilerExtension extends BaseCompilerExtension
 		$configuration->addSetup('setCustomStringFunctions', [$config['dql']['string']]);
 		$configuration->addSetup('setCustomNumericFunctions', [$config['dql']['numeric']]);
 		$configuration->addSetup('setCustomDatetimeFunctions', [$config['dql']['datetime']]);
-		$configuration->setAutowired(false);
-		$configuration->setInject(false);
+		$configuration->setAutowired(FALSE);
+		$configuration->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		foreach (['entityListenerResolver', 'namingStrategy', 'quoteStrategy'] as $key) {
 			if ($config[$key]) {
@@ -341,8 +331,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $config
 	 * @throws AssertionException
 	 */
-	private function assertConfig(array $config)
-	{
+	private function assertConfig(array $config) {
 		Validators::assertField($config, 'namespaceAlias', 'array');
 		Validators::assertField($config, 'hydrators', 'array');
 		Validators::assertField($config, 'dql', 'array');
@@ -355,13 +344,12 @@ class CompilerExtension extends BaseCompilerExtension
 		Validators::assertField($config, 'autowired', 'bool');
 	}
 
-	private function assertMetadataConfiguration($metadata)
-	{
+	private function assertMetadataConfiguration($metadata) {
 		foreach ($metadata as $driver) {
 			Validators::assert($driver, 'array');
 
 			foreach ($driver as $driverName => $paths) {
-				if (!in_array($driverName, $this->metadataDriverClasses, true)) {
+				if (!in_array($driverName, $this->metadataDriverClasses, TRUE)) {
 					throw new AssertionException(
 						"Wrong metadata driver $driverName. Allowed drivers are " .
 						implode(', ', $this->metadataDriverClasses) . '.'
@@ -379,9 +367,8 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param string $path
 	 * @throws AssertionException
 	 */
-	private function checkPath($path)
-	{
-		if (($pos = strrpos($path, '*')) !== false) {
+	private function checkPath($path) {
+		if (($pos = strrpos($path, '*')) !== FALSE) {
 			$path = substr($path, 0, $pos);
 		}
 
@@ -395,8 +382,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param string $suffix
 	 * @return string
 	 */
-	private function processCache($cache, $suffix)
-	{
+	private function processCache($cache, $suffix) {
 		return CacheHelpers::processCache(
 			$this,
 			$cache,
@@ -409,8 +395,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataAnnotationDriver($path)
-	{
+	private function createMetadataAnnotationDriver($path) {
 		return $this->createMetadataServiceDefinition()->setClass(
 			AnnotationDriver::class,
 			[$this->prefix('@cachedReader'), $path]
@@ -421,8 +406,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataYmlDriver($path)
-	{
+	private function createMetadataYmlDriver($path) {
 		return $this->createMetadataServiceDefinition()->setClass(YamlDriver::class, [$path]);
 	}
 
@@ -430,8 +414,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataYamlDriver($path)
-	{
+	private function createMetadataYamlDriver($path) {
 		return $this->createMetadataYmlDriver($path);
 	}
 
@@ -439,8 +422,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataStaticDriver($path)
-	{
+	private function createMetadataStaticDriver($path) {
 		return $this->createMetadataServiceDefinition()->setClass(StaticPHPDriver::class, [$path]);
 	}
 
@@ -448,8 +430,7 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataXmlDriver($path)
-	{
+	private function createMetadataXmlDriver($path) {
 		return $this->createMetadataServiceDefinition()->setClass(XmlDriver::class, [$path]);
 	}
 
@@ -457,21 +438,19 @@ class CompilerExtension extends BaseCompilerExtension
 	 * @param array $path
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataDbDriver($path)
-	{
+	private function createMetadataDbDriver($path) {
 		return $this->createMetadataServiceDefinition()->setClass(DatabaseDriver::class, [$path]);
 	}
 
 	/**
 	 * @return ServiceDefinition
 	 */
-	private function createMetadataServiceDefinition()
-	{
+	private function createMetadataServiceDefinition() {
 		$definition = new ServiceDefinition();
 		$definition->setClass(MappingDriver::class);
-		$definition->setAutowired(false);
-		$definition->setInject(false);
+		$definition->setAutowired(FALSE);
+		$definition->addTag(InjectExtension::TAG_INJECT, FALSE);
 		return $definition;
 	}
-	
+
 }
