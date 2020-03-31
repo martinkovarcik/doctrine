@@ -1,25 +1,27 @@
 {
-	"name": "esports/nette-doctrine",
-	"description": "Nette doctrine integration",
-	"homepage": "https://github.com/pt24/doctrine",
-	"authors": [
-		{
-			"name": "eSports",
-			"homepage": "http://www.esports.cz"
-		}
-	],
-	"require": {
-		"php": ">=5.6",
-		"nette/utils": "~2.3",
-		"nette/di": "~2.3",
-		"doctrine/orm": "~2.5"
-	},
-	"require-dev": {
-		"nette/tester": "*"
-	},
-	"autoload": {
-		"psr-4": {
-            "ESports\\Doctrine\\": "src/"
-        }
-	}
+  "name": "esports/nette-doctrine",
+  "description": "Nette doctrine integration",
+  "homepage": "https://github.com/pt24/doctrine",
+  "authors": [
+    {
+      "name": "eSports",
+      "homepage": "http://www.esports.cz"
+    }
+  ],
+  "require": {
+    "php": ">=7.1",
+    "nette/utils": "3.0.*",
+    "nette/di": "3.0.*",
+    "doctrine/orm": "~2.5"
+  },
+  "require-dev": {
+    "nette/tester": "*",
+    "phpstan/phpstan": "^0.12.17",
+    "phpstan/phpstan-php-parser": "^0.12.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "ESports\\Doctrine\\": "src/"
+    }
+  }
 }

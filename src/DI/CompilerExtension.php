@@ -11,15 +11,17 @@ use Doctrine\ORM\Configuration;
 use Doctrine\ORM\EntityManager;
 use Nette\DI\CompilerExtension as BaseCompilerExtension;
 use Nette\DI\Config\Helpers;
+use Nette\DI\Extensions\InjectExtension;
 use Nette\DI\Helpers as DIHelpers;
 
-class CompilerExtension extends BaseCompilerExtension
-{
+class CompilerExtension extends BaseCompilerExtension {
 
 	const CONNECTION = 'connection';
-	const ENTITY_MANAGER = 'em';
+
 	const EVENT_MANAGER = 'evm';
+
 	const CONFIGURATION = 'configuration';
+
 	const METADATA_DRIVER = 'metadata';
 
 	/**
@@ -27,58 +29,53 @@ class CompilerExtension extends BaseCompilerExtension
 	 */
 	private $defaults;
 
-	public function __construct()
-	{
+	public function __construct() {
 		$this->defaults = [
 			'connection' => [
-				'dbname' => null,
-				'host' => null,
-				'port' => null,
-				'user' => null,
-				'password' => null,
-				'charset' => 'UTF8',
-				'driver' => null,
-				'driverClass' => null,
-				'driverOptions' => null,
-				'server_version' => null,
+				'dbname'         => NULL,
+				'host'           => NULL,
+				'port'           => NULL,
+				'user'           => NULL,
+				'password'       => NULL,
+				'charset'        => 'UTF8',
+				'driver'         => NULL,
+				'driverClass'    => NULL,
+				'driverOptions'  => NULL,
+				'server_version' => NULL,
 			],
-
-			'dbal' => [
+			'dbal'       => [
 				'types' => [],
 			],
-
-			'orm' => [
-				'dql' => [
-					'string' => [],
-					'numeric' => [],
+			'orm'        => [
+				'dql'          => [
+					'string'   => [],
+					'numeric'  => [],
 					'datetime' => [],
 				],
 				'eventManager' => [
 					'subscribers' => [],
 				],
-				'metadata' => [
+				'metadata'     => [
 					'drivers' => [],
 				],
-				'proxy' => [
-					'autoGenerateProxyClasses' => false,
-					'proxyDir' => '%tempDir%/proxy',
-					'proxyNamespace' => 'DoctrineProxy',
+				'proxy'        => [
+					'autoGenerateProxyClasses' => FALSE,
+					'proxyDir'                 => '%tempDir%/proxy',
+					'proxyNamespace'           => 'DoctrineProxy',
 				],
-				'cache' => [
-					'metadata' => null,
-					'query' => null,
-					'result' => null,
-					'hydration' => null,
+				'cache'        => [
+					'metadata'  => NULL,
+					'query'     => NULL,
+					'result'    => NULL,
+					'hydration' => NULL,
 				],
 			],
 
-			'autowired' => true,
+			'autowired' => TRUE,
 		];
 	}
 
-
-	public function loadConfiguration()
-	{
+	public function loadConfiguration(): void {
 		$builder = $this->getContainerBuilder();
 		$config = Helpers::merge($this->config, DIHelpers::expand($this->defaults, $builder->parameters));
 
@@ -89,21 +86,19 @@ class CompilerExtension extends BaseCompilerExtension
 		$this->createEntityManager($config['autowired']);
 	}
 
-	private function createMetadataImplementationDriver(array $config)
-	{
+	private function createMetadataImplementationDriver(array $config): void {
 		$builder = $this->getContainerBuilder();
 		$evm = $builder->addDefinition($this->prefix(self::METADATA_DRIVER));
 		$evm->setClass(MappingDriverChain::class);
-		$evm->setAutowired(false);
-		$evm->setInject(false);
+		$evm->setAutowired(FALSE);
+		$evm->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		foreach ($config['drivers'] as $namespace => $driver) {
 			$evm->addSetup('addDriver', [$driver, $namespace]);
 		}
 	}
 
-	private function createConnection(array $config, array $dbalConfig, $autowired)
-	{
+	private function createConnection(array $config, array $dbalConfig, $autowired): void {
 		$builder = $this->getContainerBuilder();
 		$connection = $builder->addDefinition($this->prefix(self::CONNECTION));
 		$connection->setClass(Connection::class);
@@ -112,7 +107,7 @@ class CompilerExtension extends BaseCompilerExtension
 			[$config, $this->prefix('@' . self::CONFIGURATION), $this->prefix('@' . self::EVENT_MANAGER)]
 		);
 		$connection->setAutowired($autowired);
-		$connection->setInject(false);
+		$connection->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		foreach ($dbalConfig['types'] as $type => $class) {
 			$connection->addSetup(
@@ -126,21 +121,19 @@ class CompilerExtension extends BaseCompilerExtension
 		}
 	}
 
-	private function createEventManager(array $config)
-	{
+	private function createEventManager(array $config): void {
 		$builder = $this->getContainerBuilder();
 		$evm = $builder->addDefinition($this->prefix(self::EVENT_MANAGER));
 		$evm->setClass(EventManager::class);
-		$evm->setAutowired(false);
-		$evm->setInject(false);
+		$evm->setAutowired(FALSE);
+		$evm->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		foreach ($config['subscribers'] as $eventSubscriber) {
 			$evm->addSetup('addEventSubscriber', [$eventSubscriber]);
 		}
 	}
 
-	private function createEntityManager($autowired)
-	{
+	private function createEntityManager(bool $autoWired): void {
 		$entityManager = EntityManager::class;
 
 		$builder = $this->getContainerBuilder();
@@ -151,20 +144,19 @@ class CompilerExtension extends BaseCompilerExtension
 			[
 				$this->prefix('@' . self::CONNECTION),
 				$this->prefix('@' . self::CONFIGURATION),
-				$this->prefix('@' . self::EVENT_MANAGER)
+				$this->prefix('@' . self::EVENT_MANAGER),
 			]
 		);
-		$em->setAutowired($autowired);
-		$em->setInject(false);
+		$em->setAutowired($autoWired);
+		$em->addTag(InjectExtension::TAG_INJECT, FALSE);
 	}
 
-	private function createConfigurationService(array $config)
-	{
+	private function createConfigurationService(array $config): void {
 		$builder = $this->getContainerBuilder();
 		$configuration = $builder->addDefinition($this->prefix(self::CONFIGURATION));
 		$configuration->setClass(Configuration::class);
-		$configuration->setAutowired(false);
-		$configuration->setInject(false);
+		$configuration->setAutowired(FALSE);
+		$configuration->addTag(InjectExtension::TAG_INJECT, FALSE);
 
 		$configuration->addSetup('setMetadataDriverImpl', [$this->prefix('@' . self::METADATA_DRIVER)]);
 		$configuration->addSetup('setProxyDir', [$config['proxy']['proxyDir']]);
